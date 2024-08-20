@@ -1,0 +1,300 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+#include <zlib.h>
+#include <cctype>
+#include <cstdint> // Include the header for fixed-width integer types
+
+using namespace std;
+
+enum NBTType
+{
+    TAG_End = 0,
+    TAG_Byte = 1,
+    TAG_Short = 2,
+    TAG_Int = 3,
+    TAG_Long = 4,
+    TAG_Float = 5,
+    TAG_Double = 6,
+    TAG_Byte_Array = 7,
+    TAG_String = 8,
+    TAG_List = 9,
+    TAG_Compound = 10,
+    TAG_Int_Array = 11,
+    TAG_Long_Array = 12
+};
+
+struct ChunkLocation {
+    int offset;
+    int size;
+};
+
+vector<char> readFile(const string& filename) {
+    ifstream file(filename, ios::binary);
+    if (!file.is_open()) {
+        throw runtime_error("Failed to open file");
+    }
+    return vector<char>((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+}
+
+vector<char> decompressChunk(const vector<char>& data) {
+    z_stream zs;
+    zs.zalloc = Z_NULL;
+    zs.zfree = Z_NULL;
+    zs.opaque = Z_NULL;
+    zs.next_in = const_cast<Bytef*>(reinterpret_cast<const Bytef*>(data.data()));
+    zs.avail_in = static_cast<uInt>(data.size());
+
+    int ret = inflateInit(&zs);
+    if (ret != Z_OK) {
+        throw runtime_error("inflateInit failed");
+    }
+
+    vector<char> outBuffer(15 * 1024 * 1024); // 15 MB buffer size for the files 
+    zs.next_out = reinterpret_cast<Bytef*>(outBuffer.data());
+    zs.avail_out = outBuffer.size();
+
+    ret = inflate(&zs, Z_FINISH);
+    if (ret != Z_STREAM_END) {
+        inflateEnd(&zs);
+        throw runtime_error("inflate failed");
+    }
+
+    inflateEnd(&zs);
+    outBuffer.resize(zs.total_out);
+
+    return outBuffer;
+}
+
+vector<ChunkLocation> parseHeader(const vector<char>& data) {
+    vector<ChunkLocation> chunkLocations;
+    for (int i = 0; i < 4096; i += 4) {
+        int offset = (static_cast<unsigned char>(data[i]) << 16) |
+                     (static_cast<unsigned char>(data[i + 1]) << 8) |
+                     static_cast<unsigned char>(data[i + 2]);
+        int size = static_cast<unsigned char>(data[i + 3]);
+        chunkLocations.push_back({ offset * 4096, size * 4096 });
+    }
+    return chunkLocations;
+}
+
+string readString(const vector<char>& data, size_t& offset) {
+    int length = (static_cast<unsigned char>(data[offset]) << 8) |
+                 static_cast<unsigned char>(data[offset + 1]);
+    offset += 2;
+    string str(data.begin() + offset, data.begin() + offset + length);
+    offset += length;
+    return str;
+}
+
+void parseTag(const vector<char>& data, size_t& offset, ofstream& outputFile, int indentLevel = 0);
+
+void parseNBT(const vector<char>& data, size_t& offset, ofstream& outputFile, int indentLevel) {
+    while (offset < data.size()) {
+        if (static_cast<NBTType>(data[offset]) == TAG_End) {
+            offset++;
+            return;
+        }
+        parseTag(data, offset, outputFile, indentLevel);
+    }
+}
+
+void parseTag(const vector<char>& data, size_t& offset, ofstream& outputFile, int indentLevel) {
+    if (offset >= data.size()) {
+        throw runtime_error("Reached end of data while parsing tag");
+    }
+
+    NBTType type = static_cast<NBTType>(data[offset]);
+    if (type > TAG_Long_Array) {
+        cerr << "Warning: Unknown NBT type: " << static_cast<int>(type) << " at offset: " << offset << endl;
+        // Skipping the unknown tag
+        offset++;
+        return;
+    }
+
+    offset++;
+
+    if (type == TAG_End)
+        return;
+
+    string name = readString(data, offset);
+
+    outputFile << string(indentLevel, ' ') << "Tag: " << name << " (Type: " << static_cast<int>(type) << ")" << endl;
+
+    switch (type)
+    {
+    case TAG_Byte:
+    {
+        int8_t value = data[offset];
+        offset++;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << +value << endl;
+        break;
+    }
+    case TAG_Short:
+    {
+        int16_t value = (static_cast<unsigned char>(data[offset]) << 8) |
+                        static_cast<unsigned char>(data[offset + 1]);
+        offset += 2;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Int:
+    {
+        int32_t value = (static_cast<unsigned char>(data[offset]) << 24) |
+                        (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                        (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                        static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Long:
+    {
+        int64_t value = (static_cast<uint64_t>(static_cast<unsigned char>(data[offset])) << 56) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 1])) << 48) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 2])) << 40) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 3])) << 32) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 4])) << 24) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 5])) << 16) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 6])) << 8) |
+                        static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 7]));
+        offset += 8;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Float:
+    {
+        float value;
+        memcpy(&value, &data[offset], sizeof(float));
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Double:
+    {
+        double value;
+        memcpy(&value, &data[offset], sizeof(double));
+        offset += 8;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Byte_Array:
+    {
+        int32_t length = (static_cast<unsigned char>(data[offset]) << 24) |
+                         (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                         (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                         static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Length: " << length << endl;
+        offset += length;
+        break;
+    }
+    case TAG_String:
+    {
+        string value = readString(data, offset);
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_List:
+    {
+        NBTType listType = static_cast<NBTType>(data[offset]);
+        offset++;
+        int32_t length = (static_cast<unsigned char>(data[offset]) << 24) |
+                         (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                         (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                         static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "List Type: " << static_cast<int>(listType) << endl;
+        outputFile << string(indentLevel + 2, ' ') << "Length: " << length << endl;
+        for (int i = 0; i < length; i++)
+        {
+            parseTag(data, offset, outputFile, indentLevel + 2);
+        }
+        break;
+    }
+    case TAG_Compound:
+    {
+        outputFile << string(indentLevel + 2, ' ') << "Compound:" << endl;
+        parseNBT(data, offset, outputFile, indentLevel + 2);
+        break;
+    }
+    case TAG_Int_Array:
+    {
+        int32_t length = (static_cast<unsigned char>(data[offset]) << 24) |
+                         (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                         (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                         static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Length: " << length << endl;
+        for (int i = 0; i < length; i++)
+        {
+            int32_t value = (static_cast<unsigned char>(data[offset]) << 24) |
+                            (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                            (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                            static_cast<unsigned char>(data[offset + 3]);
+            offset += 4;
+            outputFile << string(indentLevel + 4, ' ') << "Value: " << value << endl;
+        }
+        break;
+    }
+    case TAG_Long_Array:
+    {
+        int32_t length = (static_cast<unsigned char>(data[offset]) << 24) |
+                         (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                         (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                         static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Length: " << length << endl;
+        for (int i = 0; i < length; i++)
+        {
+            int64_t value = (static_cast<uint64_t>(static_cast<unsigned char>(data[offset])) << 56) |
+                            (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 1])) << 48) |
+                            (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 2])) << 40) |
+                            (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 3])) << 32) |
+                            (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 4])) << 24) |
+                            (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 5])) << 16) |
+                            (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 6])) << 8) |
+                            static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 7]));
+            offset += 8;
+            outputFile << string(indentLevel + 4, ' ') << "Value: " << value << endl;
+        }
+        break;
+    }
+    default:
+        throw runtime_error("Unknown tag type");
+    }
+}
+
+void processChunk(const vector<char>& chunkData, ofstream& outputFile) {
+    size_t offset = 0;
+    parseNBT(chunkData, offset, outputFile, 0);
+}
+
+int main() {
+    try {
+        string filename = "r.0.0.mca";
+        vector<char> fileData = readFile(filename);
+
+        vector<ChunkLocation> chunkLocations = parseHeader(fileData);
+        ofstream outputFile("nbt_data.txt");
+
+        for (const auto& location : chunkLocations) {
+            if (location.offset == 0 || location.size == 0) {
+                continue;
+            }
+
+            vector<char> chunkData(fileData.begin() + location.offset + 5, fileData.begin() + location.offset + location.size);
+            vector<char> decompressedChunk = decompressChunk(chunkData);
+
+            processChunk(decompressedChunk, outputFile);
+        }
+
+        outputFile.close();
+        cout << "NBT data extraction completed." << endl;
+    } catch (const exception& ex) {
+        cerr << "Error: " << ex.what() << endl;
+    }
+    return 0;
+}

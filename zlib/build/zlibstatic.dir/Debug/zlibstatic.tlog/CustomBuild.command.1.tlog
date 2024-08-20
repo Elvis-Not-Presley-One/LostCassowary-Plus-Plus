@@ -1,0 +1,10 @@
+^C:\USERS\TYLER\PROJECTS\END_SIGN_DATA_READER\ZLIB\CMAKELISTS.TXT
+setlocal
+C:\Users\Tyler\Downloads\cmake-3.30.0-rc3-windows-x86_64\cmake-3.30.0-rc3-windows-x86_64\bin\cmake.exe -SC:/Users/Tyler/projects/End_Sign_Data_Reader/zlib -BC:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build --check-stamp-file C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

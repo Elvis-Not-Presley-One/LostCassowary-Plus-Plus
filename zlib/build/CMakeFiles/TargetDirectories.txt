@@ -1,0 +1,8 @@
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build/CMakeFiles/zlib.dir
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build/CMakeFiles/zlibstatic.dir
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build/CMakeFiles/example.dir
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build/CMakeFiles/minigzip.dir
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build/CMakeFiles/RUN_TESTS.dir
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build/CMakeFiles/INSTALL.dir
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/build/CMakeFiles/ZERO_CHECK.dir

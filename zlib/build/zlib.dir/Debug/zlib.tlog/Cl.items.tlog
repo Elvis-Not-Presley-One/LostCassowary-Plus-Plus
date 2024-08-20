@@ -1,0 +1,15 @@
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\adler32.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\adler32.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\compress.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\compress.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\crc32.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\crc32.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\deflate.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\deflate.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\gzclose.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\gzclose.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\gzlib.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\gzlib.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\gzread.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\gzread.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\gzwrite.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\gzwrite.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\inflate.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\inflate.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\infback.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\infback.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\inftrees.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\inftrees.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\inffast.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\inffast.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\trees.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\trees.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\uncompr.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\uncompr.obj
+C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\zutil.c;C:\Users\Tyler\projects\End_Sign_Data_Reader\zlib\build\zlib.dir\Debug\zutil.obj

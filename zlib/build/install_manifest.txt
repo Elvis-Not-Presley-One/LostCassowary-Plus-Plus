@@ -1,0 +1,7 @@
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/install/lib/zlibd.lib
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/install/bin/zlibd.dll
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/install/lib/zlibstaticd.lib
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/install/include/zconf.h
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/install/include/zlib.h
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/install/share/man/man3/zlib.3
+C:/Users/Tyler/projects/End_Sign_Data_Reader/zlib/install/share/pkgconfig/zlib.pc

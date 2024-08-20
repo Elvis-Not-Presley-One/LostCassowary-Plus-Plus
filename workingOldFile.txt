@@ -1,0 +1,609 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+#include <zlib.h>
+
+using namespace std;
+
+struct ChunkLocation {
+    int offset;
+    int size;
+};
+
+vector<char> readFile(const string& filename) {
+    ifstream file(filename, ios::binary);
+    if (!file.is_open()) {
+        throw runtime_error("Failed to open file");
+    }
+    return vector<char>((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+}
+
+vector<char> decompressChunk(const vector<char>& data) {
+    z_stream zs;
+    zs.zalloc = Z_NULL;
+    zs.zfree = Z_NULL;
+    zs.opaque = Z_NULL;
+    zs.next_in = const_cast<Bytef*>(reinterpret_cast<const Bytef*>(data.data()));
+    zs.avail_in = static_cast<uInt>(data.size());
+
+    int ret = inflateInit(&zs);
+    if (ret != Z_OK) {
+        throw runtime_error("inflateInit failed");
+    }
+
+    vector<char> outBuffer(1024 * 1024); // Example buffer size
+    zs.next_out = reinterpret_cast<Bytef*>(outBuffer.data());
+    zs.avail_out = outBuffer.size();
+
+    ret = inflate(&zs, Z_FINISH);
+    if (ret != Z_STREAM_END) {
+        inflateEnd(&zs);
+        throw runtime_error("inflate failed");
+    }
+
+    inflateEnd(&zs);
+    outBuffer.resize(zs.total_out);
+
+    return outBuffer;
+}
+
+vector<ChunkLocation> parseHeader(const vector<char>& data) {
+    vector<ChunkLocation> chunkLocations;
+    for (int i = 0; i < 4096; i += 4) {
+        int offset = (static_cast<unsigned char>(data[i]) << 16) |
+                     (static_cast<unsigned char>(data[i + 1]) << 8) |
+                     static_cast<unsigned char>(data[i + 2]);
+        int size = static_cast<unsigned char>(data[i + 3]);
+        chunkLocations.push_back({ offset * 4096, size * 4096 });
+    }
+    return chunkLocations;
+}
+
+void extractNBTData(const vector<char>& chunkData, ofstream& outputFile) {
+    size_t offset = 0;
+    int length = (static_cast<unsigned char>(chunkData[offset]) << 24) |
+                 (static_cast<unsigned char>(chunkData[offset + 1]) << 16) |
+                 (static_cast<unsigned char>(chunkData[offset + 2]) << 8) |
+                 static_cast<unsigned char>(chunkData[offset + 3]);
+    char compressionType = chunkData[offset + 4];
+    offset += 5;
+
+    if (compressionType == 2) {  // Zlib compression
+        vector<char> decompressedData = decompressChunk(vector<char>(chunkData.begin() + offset, chunkData.end()));
+
+        // Filter and write clean NBT data to output file
+        for (char ch : decompressedData) {
+            if (isprint(ch) || ch == '\n' || ch == '\t') {
+                outputFile << ch;
+            }
+        }
+        outputFile.flush();
+    } else {
+        throw runtime_error("Unsupported compression type");
+    }
+}
+
+int main() {
+    try {
+        string filename = "r.0.0.mca";
+        vector<char> data = readFile(filename);
+        vector<ChunkLocation> chunkLocations = parseHeader(data);
+
+        ofstream outputFile("all_chunk_data.dat", ios::binary);
+        if (!outputFile.is_open()) {
+            throw runtime_error("Failed to open output file");
+        }
+
+        for (const auto& chunkLocation : chunkLocations) {
+            if (chunkLocation.offset == 0 || chunkLocation.size == 0) continue;
+
+            vector<char> chunkData(data.begin() + chunkLocation.offset, data.begin() + chunkLocation.offset + chunkLocation.size);
+            
+            extractNBTData(chunkData, outputFile);
+        }
+
+        outputFile.close();
+        cout << "All chunk and NBT data saved to 'all_chunk_data.dat'" << endl;
+
+    } catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+
+    return 0;
+}
+
+
+
+____________________________________________________________________________________-----
+
+
+
+
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+#include <zlib.h>
+#include <cctype> // For isprint()
+
+using namespace std;
+
+struct ChunkLocation {
+    int offset;
+    int size;
+};
+
+vector<char> readFile(const string& filename) {
+    ifstream file(filename, ios::binary);
+    if (!file.is_open()) {
+        throw runtime_error("Failed to open file");
+    }
+    return vector<char>((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+}
+
+vector<char> decompressChunk(const vector<char>& data) {
+    z_stream zs;
+    zs.zalloc = Z_NULL;
+    zs.zfree = Z_NULL;
+    zs.opaque = Z_NULL;
+    zs.next_in = const_cast<Bytef*>(reinterpret_cast<const Bytef*>(data.data()));
+    zs.avail_in = static_cast<uInt>(data.size());
+
+    int ret = inflateInit(&zs);
+    if (ret != Z_OK) {
+        throw runtime_error("inflateInit failed");
+    }
+
+    vector<char> outBuffer(1024 * 1024); // Example buffer size
+    zs.next_out = reinterpret_cast<Bytef*>(outBuffer.data());
+    zs.avail_out = outBuffer.size();
+
+    ret = inflate(&zs, Z_FINISH);
+    if (ret != Z_STREAM_END) {
+        inflateEnd(&zs);
+        throw runtime_error("inflate failed");
+    }
+
+    inflateEnd(&zs);
+    outBuffer.resize(zs.total_out);
+
+    return outBuffer;
+}
+
+vector<ChunkLocation> parseHeader(const vector<char>& data) {
+    vector<ChunkLocation> chunkLocations;
+    for (int i = 0; i < 4096; i += 4) {
+        int offset = (static_cast<unsigned char>(data[i]) << 16) |
+                     (static_cast<unsigned char>(data[i + 1]) << 8) |
+                     static_cast<unsigned char>(data[i + 2]);
+        int size = static_cast<unsigned char>(data[i + 3]);
+        chunkLocations.push_back({ offset * 4096, size * 4096 });
+    }
+    return chunkLocations;
+}
+
+void extractNBTData(const vector<char>& chunkData, ofstream& outputFile, int chunkX, int chunkZ) {
+    size_t offset = 0;
+    int length = (static_cast<unsigned char>(chunkData[offset]) << 24) |
+                 (static_cast<unsigned char>(chunkData[offset + 1]) << 16) |
+                 (static_cast<unsigned char>(chunkData[offset + 2]) << 8) |
+                 static_cast<unsigned char>(chunkData[offset + 3]);
+    char compressionType = chunkData[offset + 4];
+    offset += 5;
+
+    if (compressionType == 2) {  // Zlib compression
+        vector<char> decompressedData = decompressChunk(vector<char>(chunkData.begin() + offset, chunkData.end()));
+
+        // Write chunk coordinates
+        outputFile << "Chunk X: " << chunkX << ", Chunk Z: " << chunkZ << "\n";
+        
+        // Filter and write clean NBT data to output file
+        for (char ch : decompressedData) {
+            if (isprint(ch) || ch == '\n' || ch == '\t') {
+                outputFile << ch;
+            }
+        }
+        outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+                outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+        outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+        outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+        outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+
+        outputFile.flush();
+    } else if (compressionType == 1) {  // Uncompressed
+        vector<char> uncompressedData(chunkData.begin() + offset, chunkData.begin() + offset + length);
+
+        // Write chunk coordinates
+        outputFile << "Chunk X: " << chunkX << ", Chunk Z: " << chunkZ << "\n";
+        
+        for (char ch : uncompressedData) {
+            if (isprint(ch) || ch == '\n' || ch == '\t') {
+                outputFile << ch;
+            }
+        }
+        outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+                outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+        outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+        outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+        outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+        outputFile << "\n---------------------------\n"; // Line to distinguish chunks
+
+        outputFile.flush();
+    } else {
+        throw runtime_error("Unsupported compression type: " + to_string(compressionType));
+    }
+}
+
+int main() {
+    try {
+        string filename = "r.0.0.mca";
+        vector<char> data = readFile(filename);
+        vector<ChunkLocation> chunkLocations = parseHeader(data);
+
+        ofstream outputFile("all_chunk_data.dat", ios::binary);
+        if (!outputFile.is_open()) {
+            throw runtime_error("Failed to open output file");
+        }
+
+        for (int i = 0; i < chunkLocations.size(); ++i) {
+            const auto& chunkLocation = chunkLocations[i];
+            if (chunkLocation.offset == 0 || chunkLocation.size == 0) continue;
+
+            int chunkX = (i % 32) * 16; // Column in the 32x32 grid, multiplied by 16 for chunk size
+            int chunkZ = (i / 32) * 16; // Row in the 32x32 grid, multiplied by 16 for chunk size
+
+            vector<char> chunkData(data.begin() + chunkLocation.offset, data.begin() + chunkLocation.offset + chunkLocation.size);
+            
+            extractNBTData(chunkData, outputFile, chunkX, chunkZ);
+        }
+
+        outputFile.close();
+        cout << "All chunk and NBT data saved to 'all_chunk_data.dat'" << endl;
+
+    } catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+
+    return 0;
+}
+
+/*
+.mca (Anvil) files are a newer format introduced in the Minecraft 1.2.1 update. Main differences are:
+
+    Maximum build height has been increased to 256 (from 128).
+    Empty sections of the world are not loaded into memory or saved to disk.
+    The maximum Block ID has been increased to 4096 (was 256) by adding a 4-bit data layer (similar to how meta data is stored). 
+    Block ordering has been changed from XZY to YZX in order to improve compression.
+    Packets for sending chunks have been optimized.
+    Biomes are saved per X,Z column, rather than being calculated on the fly.
+*/
+
+
+
+__________________________________________________________________________________________________________________________________
+
+
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+#include <zlib.h>
+#include <cctype>
+#include <cstdint> // Include the header for fixed-width integer types
+
+using namespace std;
+
+enum NBTType
+{
+    TAG_End = 0,
+    TAG_Byte = 1,
+    TAG_Short = 2,
+    TAG_Int = 3,
+    TAG_Long = 4,
+    TAG_Float = 5,
+    TAG_Double = 6,
+    TAG_Byte_Array = 7,
+    TAG_String = 8,
+    TAG_List = 9,
+    TAG_Compound = 10,
+    TAG_Int_Array = 11,
+    TAG_Long_Array = 12
+};
+
+struct ChunkLocation
+{
+    int offset;
+    int size;
+};
+
+vector<char> readFile(const string &filename)
+{
+    ifstream file(filename, ios::binary);
+    if (!file.is_open())
+    {
+        throw runtime_error("Failed to open file");
+    }
+    return vector<char>((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+}
+
+vector<char> decompressChunk(const vector<char> &data)
+{
+    z_stream zs;
+    zs.zalloc = Z_NULL;
+    zs.zfree = Z_NULL;
+    zs.opaque = Z_NULL;
+    zs.next_in = const_cast<Bytef *>(reinterpret_cast<const Bytef *>(data.data()));
+    zs.avail_in = static_cast<uInt>(data.size());
+
+    int ret = inflateInit(&zs);
+    if (ret != Z_OK)
+    {
+        throw runtime_error("inflateInit failed");
+    }
+
+    vector<char> outBuffer(15 * 1024 * 1024); // 15 MB buffer size for the files 
+    zs.next_out = reinterpret_cast<Bytef *>(outBuffer.data());
+    zs.avail_out = outBuffer.size();
+
+    ret = inflate(&zs, Z_FINISH);
+    if (ret != Z_STREAM_END)
+    {
+        inflateEnd(&zs);
+        throw runtime_error("inflate failed");
+    }
+
+    inflateEnd(&zs);
+    outBuffer.resize(zs.total_out);
+
+    return outBuffer;
+}
+
+vector<ChunkLocation> parseHeader(const vector<char> &data)
+{
+    vector<ChunkLocation> chunkLocations;
+    for (int i = 0; i < 4096; i += 4)
+    {
+        int offset = (static_cast<unsigned char>(data[i]) << 16) |
+                     (static_cast<unsigned char>(data[i + 1]) << 8) |
+                     static_cast<unsigned char>(data[i + 2]);
+        int size = static_cast<unsigned char>(data[i + 3]);
+        chunkLocations.push_back({offset * 4096, size * 4096});
+    }
+    return chunkLocations;
+}
+
+string readString(const vector<char> &data, size_t &offset)
+{
+    int length = (static_cast<unsigned char>(data[offset]) << 8) |
+                 static_cast<unsigned char>(data[offset + 1]);
+    offset += 2;
+    string str(data.begin() + offset, data.begin() + offset + length);
+    offset += length;
+    return str;
+}
+
+void parseTag(const vector<char> &data, size_t &offset, ofstream &outputFile, int indentLevel = 0);
+
+void parseNBT(const vector<char> &data, size_t &offset, ofstream &outputFile, int indentLevel)
+{
+    while (offset < data.size())
+    {
+        if (static_cast<NBTType>(data[offset]) == TAG_End)
+        {
+            offset++;
+            return;
+        }
+        parseTag(data, offset, outputFile, indentLevel);
+    }
+}
+
+void parseTag(const vector<char> &data, size_t &offset, ofstream &outputFile, int indentLevel)
+{
+    if (offset >= data.size())
+    {
+        throw runtime_error("Reached end of data while parsing tag");
+    }
+
+    NBTType type = static_cast<NBTType>(data[offset]);
+    if (type > TAG_Long_Array)
+    {
+        cerr << "Warning: Unknown NBT type: " << static_cast<int>(type) << " at offset: " << offset << endl;
+        // Skipping the unknown tag
+        offset++;
+        return;
+    }
+
+    offset++;
+
+    if (type == TAG_End)
+        return;
+
+    string name = readString(data, offset);
+
+    outputFile << string(indentLevel, ' ') << "Tag: " << name << " (Type: " << static_cast<int>(type) << ")" << endl;
+
+    switch (type)
+    {
+    case TAG_Byte:
+    {
+        int8_t value = data[offset];
+        offset++;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << +value << endl;
+        break;
+    }
+    case TAG_Short:
+    {
+        int16_t value = (static_cast<unsigned char>(data[offset]) << 8) |
+                        static_cast<unsigned char>(data[offset + 1]);
+        offset += 2;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Int:
+    {
+        int32_t value = (static_cast<unsigned char>(data[offset]) << 24) |
+                        (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                        (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                        static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Long:
+    {
+        int64_t value = (static_cast<uint64_t>(static_cast<unsigned char>(data[offset])) << 56) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 1])) << 48) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 2])) << 40) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 3])) << 32) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 4])) << 24) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 5])) << 16) |
+                        (static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 6])) << 8) |
+                        static_cast<uint64_t>(static_cast<unsigned char>(data[offset + 7]));
+        offset += 8;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Float:
+    {
+        float value;
+        memcpy(&value, &data[offset], sizeof(float));
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Double:
+    {
+        double value;
+        memcpy(&value, &data[offset], sizeof(double));
+        offset += 8;
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_Byte_Array:
+    {
+        int32_t length = (static_cast<unsigned char>(data[offset]) << 24) |
+                         (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                         (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                         static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Length: " << length << endl;
+        offset += length;
+        break;
+    }
+    case TAG_String:
+    {
+        string value = readString(data, offset);
+        outputFile << string(indentLevel + 2, ' ') << "Value: " << value << endl;
+        break;
+    }
+    case TAG_List:
+    {
+        NBTType listType = static_cast<NBTType>(data[offset]);
+        offset++;
+        int32_t length = (static_cast<unsigned char>(data[offset]) << 24) |
+                         (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                         (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                         static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "List Type: " << static_cast<int>(listType) << endl;
+        outputFile << string(indentLevel + 2, ' ') << "Length: " << length << endl;
+        for (int i = 0; i < length; i++)
+        {
+            parseTag(data, offset, outputFile, indentLevel + 2);
+        }
+        break;
+    }
+    case TAG_Compound:
+    {
+        outputFile << string(indentLevel + 2, ' ') << "Compound:" << endl;
+        parseNBT(data, offset, outputFile, indentLevel + 2);
+        break;
+    }
+    case TAG_Int_Array:
+    {
+        int32_t length = (static_cast<unsigned char>(data[offset]) << 24) |
+                         (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                         (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                         static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Length: " << length << endl;
+        offset += length * 4;
+        break;
+    }
+    case TAG_Long_Array:
+    {
+        int32_t length = (static_cast<unsigned char>(data[offset]) << 24) |
+                         (static_cast<unsigned char>(data[offset + 1]) << 16) |
+                         (static_cast<unsigned char>(data[offset + 2]) << 8) |
+                         static_cast<unsigned char>(data[offset + 3]);
+        offset += 4;
+        outputFile << string(indentLevel + 2, ' ') << "Length: " << length << endl;
+        offset += length * 8;
+        break;
+    }
+    default:
+        throw runtime_error("Unknown NBT type: " + to_string(static_cast<int>(type)));
+    }
+}
+
+void extractNBTData(const vector<char> &chunkData, ofstream &outputFile)
+{
+    size_t offset = 0;
+    int32_t length = (static_cast<unsigned char>(chunkData[offset]) << 24) |
+                     (static_cast<unsigned char>(chunkData[offset + 1]) << 16) |
+                     (static_cast<unsigned char>(chunkData[offset + 2]) << 8) |
+                     static_cast<unsigned char>(chunkData[offset + 3]);
+    char compressionType = chunkData[offset + 4];
+    offset += 5;
+
+    if (compressionType == 2)
+    { // Zlib compression
+        vector<char> decompressedData = decompressChunk(vector<char>(chunkData.begin() + offset, chunkData.end()));
+
+        size_t decompressedOffset = 0;
+        parseNBT(decompressedData, decompressedOffset, outputFile, 0);
+    }
+    else
+    {
+        throw runtime_error("Unsupported compression type");
+    }
+}
+
+int main()
+{
+    try
+    {
+        string filename = "r.0.0.mca";
+        vector<char> data = readFile(filename);
+        vector<ChunkLocation> chunkLocations = parseHeader(data);
+
+        ofstream outputFile("all_chunk_data.dat", ios::binary);
+        if (!outputFile.is_open())
+        {
+            throw runtime_error("Failed to open output file");
+        }
+
+        for (const auto &chunkLocation : chunkLocations)
+        {
+            if (chunkLocation.offset == 0 || chunkLocation.size == 0)
+                continue;
+
+            vector<char> chunkData(data.begin() + chunkLocation.offset, data.begin() + chunkLocation.offset + chunkLocation.size);
+
+            extractNBTData(chunkData, outputFile);
+        }
+
+        outputFile.close();
+        cout << "All chunk and NBT data saved to 'all_chunk_data.dat'" << endl;
+    }
+    catch (const exception &e)
+    {
+        cerr << "Error: " << e.what() << endl;
+    }
+
+    return 0;
+}

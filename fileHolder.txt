@@ -1,0 +1,210 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+#include <cstdio>
+#include <sstream>
+#include <zlib.h>
+#include <crtp_tag.h>
+#include <endian_str.h>
+#include <make_unique.h>
+#include <nbt_tags.h>
+#include <nbt_visitor.h>
+#include <primitive_detail.h>
+#include <tag_array.h>
+#include <tag_compound.h>
+#include <tag_list.h>
+#include <tag_primitive.h>
+#include <tag_string.h>
+#include <tag.h>
+#include <tagfwd.h>
+#include <value_initializer.h>
+#include <value.h>
+#include <izlibstream.h>
+#include <ozlibstream.h>
+#include <stream_reader.h>
+#include <stream_writer.h>
+#include <zlib_streambuf.h>
+#include <nbt_export.h>
+
+using namespace std;
+using namespace nbt;
+
+struct ChunkLocation {
+    int offset;
+    int size;
+};
+
+struct BlockInfo {
+    int x, y, z;
+    vector<string> messages;
+};
+
+// Function to read a file into a vector of characters
+vector<char> readFile(const string& filename) {
+    ifstream file(filename, ios::binary);
+    if (!file.is_open()) {
+        throw runtime_error("Failed to open file: " + filename);
+    }
+    return vector<char>((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+}
+
+// Function to decompress a chunk using zlib
+vector<char> decompressChunk(const vector<char>& data) {
+    z_stream zs;
+    zs.zalloc = Z_NULL;
+    zs.zfree = Z_NULL;
+    zs.opaque = Z_NULL;
+    zs.next_in = const_cast<Bytef*>(reinterpret_cast<const Bytef*>(data.data()));
+    zs.avail_in = static_cast<uInt>(data.size());
+
+    int ret = inflateInit(&zs);
+    if (ret != Z_OK) {
+        throw runtime_error("inflateInit failed");
+    }
+
+    vector<char> outBuffer(1024 * 1024); // Example buffer size
+    zs.next_out = reinterpret_cast<Bytef*>(outBuffer.data());
+    zs.avail_out = outBuffer.size();
+
+    ret = inflate(&zs, Z_FINISH);
+    if (ret != Z_STREAM_END) {
+        inflateEnd(&zs);
+        throw runtime_error("inflate failed");
+    }
+
+    inflateEnd(&zs);
+    outBuffer.resize(zs.total_out);
+
+    return outBuffer;
+}
+
+// Helper function to get a compound tag and ensure it exists
+nbt::tag_compound& getCompoundTag(nbt::tag_compound& parent, const string& key) {
+    return static_cast<nbt::tag_compound&>(parent[key]);
+}
+
+// Helper function to get an int tag and ensure it exists
+int getIntTag(nbt::tag_compound& parent, const string& key) {
+    return static_cast<nbt::tag_int&>(parent[key]).get();
+}
+
+// Helper function to get a string tag and ensure it exists
+string getStringTag(nbt::tag_compound& parent, const string& key) {
+    return static_cast<nbt::tag_string&>(parent[key]).get();
+}
+
+// Function to parse NBT data and extract block information
+vector<BlockInfo> parseNBTData(const vector<char>& data) {
+    vector<BlockInfo> blocks;
+
+    // Create an input stream from the data
+    istringstream inputStream(string(data.begin(), data.end()), ios::binary);
+
+    // Read the NBT data from the stream
+    auto root = nbt::io::read_compound(inputStream);
+    if (!root.second) {
+        throw runtime_error("Failed to read root tag");
+    }
+
+    // Access the root tag compound
+    auto& rootCompound = static_cast<nbt::tag_compound&>(*root.second);
+    auto& level = getCompoundTag(rootCompound, "Level");
+    auto& tileEntities = static_cast<nbt::tag_list&>(level["TileEntities"]);
+
+    // Iterate over the tile entities
+    for (const auto& entity : tileEntities) {
+        if (entity.type() != nbt::tag_type::TAG_COMPOUND) continue;
+
+        auto& entityCompound = static_cast<nbt::tag_compound&>(entity);
+
+        // Check if "id" exists and is a string
+        if (entityCompound.contains("id") && entityCompound["id"].type() == nbt::tag_type::TAG_STRING) {
+            string id = getStringTag(entityCompound, "id");
+
+            // Check if the id matches "minecraft:sign"
+            if (id == "minecraft:sign") {
+                BlockInfo blockInfo;
+
+                // Access other fields directly using static_cast
+                blockInfo.x = getIntTag(entityCompound, "x");
+                blockInfo.y = getIntTag(entityCompound, "y");
+                blockInfo.z = getIntTag(entityCompound, "z");
+
+                for (int j = 0; j < 4; j++) {
+                    string textTag = "Text" + to_string(j + 1);
+
+                    // Check and access text tags
+                    if (entityCompound.contains(textTag) && entityCompound[textTag].type() == nbt::tag_type::TAG_STRING) {
+                        blockInfo.messages.push_back(getStringTag(entityCompound, textTag));
+                    }
+                }
+                blocks.push_back(blockInfo);
+            }
+        }
+    }
+
+    return blocks;
+}
+
+// Function to parse the header of the region file and get chunk locations
+vector<ChunkLocation> parseHeader(const vector<char>& data) {
+    vector<ChunkLocation> chunkLocations;
+    for (int i = 0; i < 4096; i += 4) {
+        int offset = (static_cast<unsigned char>(data[i]) << 16) |
+                     (static_cast<unsigned char>(data[i + 1]) << 8) |
+                     static_cast<unsigned char>(data[i + 2]);
+        int size = static_cast<unsigned char>(data[i + 3]);
+        chunkLocations.push_back({ offset * 4096, size * 4096 });
+    }
+    return chunkLocations;
+}
+
+int main() {
+    try {
+        string filename = "r.0.0.mca";
+        cout << "Reading file: " << filename << endl;
+        vector<char> data = readFile(filename);
+        cout << "File read successfully. Size: " << data.size() << " bytes" << endl;
+
+        vector<ChunkLocation> chunkLocations = parseHeader(data);
+        cout << "Parsed " << chunkLocations.size() << " chunk locations" << endl;
+
+        ofstream outputFile("all_chunk_data.dat", ios::binary);
+        if (!outputFile.is_open()) {
+            throw runtime_error("Failed to open output file");
+        }
+        cout << "Output file opened successfully" << endl;
+
+        vector<BlockInfo> allBlocks;
+        for (const auto& chunkLocation : chunkLocations) {
+            if (chunkLocation.offset == 0 || chunkLocation.size == 0) continue;
+
+            cout << "Processing chunk at offset " << chunkLocation.offset << " with size " << chunkLocation.size << endl;
+            vector<char> chunkData(data.begin() + chunkLocation.offset, data.begin() + chunkLocation.offset + chunkLocation.size);
+
+            vector<char> decompressedData = decompressChunk(chunkData);
+            cout << "Decompressed chunk. Decompressed size: " << decompressedData.size() << " bytes" << endl;
+
+            vector<BlockInfo> blocks = parseNBTData(decompressedData);
+            allBlocks.insert(allBlocks.end(), blocks.begin(), blocks.end());
+        }
+
+        for (const auto& block : allBlocks) {
+            outputFile << "Block at [X=" << block.x << ", Y=" << block.y << ", Z=" << block.z << "]:\n";
+            for (const auto& message : block.messages) {
+                outputFile << "  " << message << "\n";
+            }
+        }
+
+        outputFile.close();
+        cout << "All chunk and NBT data saved to 'all_chunk_data.dat'" << endl;
+
+    } catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+        return -1;
+    }
+
+    return 0;
+}
