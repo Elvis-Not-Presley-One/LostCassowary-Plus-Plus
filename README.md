@@ -11,3 +11,6 @@ I have added a copy of both zlib and a json lib in this repository so if anyone 
 I am currently working on a java version of this program that will handle all of the nbt data and more in a more graceful manner. the java version will also include grapghs and hopefuly a 3d render of the region(s). 
 
 The whole point of me workign on this in c/c++ was to try and mess around with the language. So if anyone wants to use the shity code for their projects they can. Yes I know the code is very bad and also slow and very disorginazed but it was a mini progect to learn more c/c++; Im also going to use the knowledge from this project for the java project since java is my main language. 
+
+**How To Run The Program**
+If for some reason you want to run this program you would need to have C++ downloaded with a Terminal of your choice with the text editor of your choice also. Since its c++ the progam should only be compatible for Windows since I did not add any support to any other OS since im lazy and dont feel like doing it. Thats another reason why I want to make an java version.  
